@@ -1,3 +1,15 @@
+修復了Symfony 7.4 的兼容性问题在 laravel 11以上的問題
+<br>
+原因是$request->get 已經不被支持，已手動替換為$request->query->get
+並把下載檔案，包進來一起做版控，防止未來 https://download.cksource.com/CKFinder/CKFinder%20for%20PHP/
+被整站移除。
+
+有伙伴要使用，請下載 2.3 版
+
+本程式將定期維護，若有bug ，請來信修正
+
+rtggjkdsgn@gmail.com 
+
 <h3 align="center"><img src="https://user-images.githubusercontent.com/803299/42567830-6b6d3ad6-850b-11e8-9151-43021c92d8b7.png"></h3>
 
 # CKFinder 3 Package for Laravel 9+ [![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/intent/tweet?text=Check%20out%20CKFinder%20package%20for%20Laravel%20&url=https://github.com/ckfinder/ckfinder-laravel-package)
