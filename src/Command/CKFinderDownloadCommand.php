@@ -51,7 +51,7 @@ class CKFinderDownloadCommand extends Command
         }
 
         // 指向本地 ZIP 檔
-        $zipPath = base_path('vendor/spc2356789/ckfinder_php_' . self::LATEST_VERSION . '.zip');
+        $zipPath = base_path('vendor/spcdesign/ckfinder-laravel-package/ckfinder_php_' . self::LATEST_VERSION . '.zip');
         if (!file_exists($zipPath)) {
             $this->error('CKFinder ZIP file not found at: ' . $zipPath);
             return;
