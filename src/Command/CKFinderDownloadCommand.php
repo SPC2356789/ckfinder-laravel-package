@@ -30,113 +30,71 @@ class CKFinderDownloadCommand extends Command
     public function handle()
     {
         $targetPublicPath = realpath(__DIR__ . '/../../public/');
-
         if (!is_writable($targetPublicPath)) {
             $this->error('The target public directory is not writable (used path: ' . $targetPublicPath . ').');
-
             return;
         }
 
-        $targetConnectorPath = realpath(__DIR__ . '/../../_connector');
-
+        $targetConnectorPath = __DIR__ . '/../../_connector'; // 不用 realpath 以便自動建立
+        if (!file_exists($targetConnectorPath)) {
+            mkdir($targetConnectorPath, 0755, true);
+            $this->info('Created _connector directory at: ' . $targetConnectorPath);
+        }
         if (!is_writable($targetConnectorPath)) {
-            $this->error('The the connector directory is not writable (used path: ' . $targetConnectorPath . ').');
-
+            $this->error('The connector directory is not writable (used path: ' . $targetConnectorPath . ').');
             return;
         }
 
         if (file_exists($targetPublicPath.'/ckfinder/ckfinder.js')) {
-            $questionText =
-                'It looks like the CKFinder distribution package has already been installed. ' .
-                "This command will overwrite the existing files.\nDo you want to proceed? [y/n]: ";
-
-            if (!$this->confirm($questionText)) {
-                return;
-            }
+            $questionText = 'CKFinder seems already installed. This will overwrite existing files. Proceed? [y/n]: ';
+            if (!$this->confirm($questionText)) return;
         }
 
-        /** @var \Symfony\Component\Console\Helper\ProgressBar $progressBar */
-        $progressBar = null;
-
-        $maxBytes = 0;
-        $ctx = stream_context_create([], [
-            'notification' =>
-                function ($notificationCode, $severity, $message, $messageCode, $bytesTransferred, $bytesMax) use (&$maxBytes, &$progressBar) {
-                    switch ($notificationCode) {
-                        case STREAM_NOTIFY_FILE_SIZE_IS:
-                            $maxBytes = $bytesMax;
-                            $progressBar = $this->output->createProgressBar($bytesMax);
-                            break;
-                        case STREAM_NOTIFY_PROGRESS:
-                            $progressBar->setProgress($bytesTransferred);
-                            break;
-                    }
-                }
-        ]);
-
-        $this->info('Downloading the CKFinder 3 distribution package.');
-
-        $zipContents = @file_get_contents($this->buildPackageUrl(), false, $ctx);
-
-        if ($zipContents === false) {
-            $this->error('Could not download the distribution package of CKFinder.');
-
+        // 指向本地 ZIP 檔
+        $zipPath = base_path('vendor/spc2356789/ckfinder_php_' . self::LATEST_VERSION . '.zip');
+        if (!file_exists($zipPath)) {
+            $this->error('CKFinder ZIP file not found at: ' . $zipPath);
             return;
         }
 
-        if ($progressBar) {
-            $progressBar->finish();
+        $this->info('Using local CKFinder ZIP: ' . $zipPath);
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath) !== true) {
+            $this->error('Failed to open ZIP archive.');
+            return;
         }
 
-        $this->line("\n" . 'Extracting CKFinder to the ' . $targetPublicPath . ' directory.');
-
-        $tempZipFile = tempnam(sys_get_temp_dir(), 'tmp');
-        file_put_contents($tempZipFile, $zipContents);
-        $zip = new \ZipArchive();
-        $zip->open($tempZipFile);
-
+        $this->info('Extracting CKFinder files...');
+        $filesToKeep = ['ckfinder/config.js', 'ckfinder/ckfinder.html'];
         $zipEntries = [];
-
-        // These files won't be overwritten if already exists
-        $filesToKeep = [
-            'ckfinder/config.js',
-            'ckfinder/ckfinder.html'
-        ];
 
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $entry = $zip->getNameIndex($i);
-
             if (in_array($entry, $filesToKeep) && file_exists($targetPublicPath . '/' . $entry)) {
                 continue;
             }
-
             $zipEntries[] = $entry;
         }
 
         $zip->extractTo($targetPublicPath, $zipEntries);
+        $zip->close();
 
-        $fs = new Filesystem();
+        $this->info('Moving CKFinder connector files to _connector...');
+        $fs = new \Illuminate\Filesystem\Filesystem();
+        $sourcePath = $targetPublicPath . '/ckfinder/core/connector/php/vendor/cksource/ckfinder/src/CKSource/CKFinder';
 
-        $this->line('Moving the CKFinder connector to the ' . $targetConnectorPath . ' directory.');
-        $fs->moveDirectory(
-            $targetPublicPath . '/ckfinder/core/connector/php/vendor/cksource/ckfinder/src/CKSource/CKFinder',
-            $targetConnectorPath,
-            true
-        );
+        // 使用 copyDirectory 避免刪掉 _connector
+        $fs->copyDirectory($sourcePath, $targetConnectorPath);
 
-        $this->line('Cleaning up.');
-
+        $this->info('Cleaning up temporary files...');
         $fs->delete([
-            $tempZipFile,
             $targetPublicPath . '/ckfinder/config.php',
             $targetPublicPath . '/ckfinder/README.md',
-            $targetConnectorPath . '/README.md'
         ]);
-
         $fs->deleteDirectory($targetPublicPath . '/ckfinder/core');
         $fs->deleteDirectory($targetPublicPath . '/ckfinder/userfiles');
 
-
-        $this->info('Done. Happy coding!');
+        $this->info('Done. CKFinder is ready!');
     }
 }
